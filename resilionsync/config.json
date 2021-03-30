@@ -9,11 +9,11 @@
     "startup": "services",
     "boot": "auto",
     "ports": {
-        "8888/tcp": null
+        "8888/tcp": null,
         "55555/tcp": null
     },
     "ports_description": {
-        "8888/tcp": "Web interface"
+        "8888/tcp": "Web interface",
         "55555/tcp": "Sync Port"
     },
     "map": [

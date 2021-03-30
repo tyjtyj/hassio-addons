@@ -1,0 +1,34 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Build ${{ matrix.addon }} add-on
+          if: steps.check.outputs.build_arch == 'true'
+        uses: home-assistant/builder@master
+        with:
+          args: |
+            ${{ env.BUILD_ARGS }} \
+            --${{ matrix.arch }} \
+            --target /data/${{ matrix.addon }} \
+            --docker-hub ${{ secrets.DOCKERHUB_USERNAME }}
+    strategy:
+      matrix: 
+        addon: ${{ fromJson(needs.init.outputs.changed_addons) }}
+        
+        
+        
+        
+        

@@ -1,114 +1,147 @@
-name: Build add-on
-
-env:
-  BUILD_ARGS: "--test"
-  MONITORED_FILES: "build.json config.json Dockerfile run.sh"
-
+name: Deploy addons
 on:
-  pull_request:
-    branches: ["master"]
   push:
-    branches: ["master"]
+    branches:
+      - master
 
 jobs:
-  init:
+  check-addon-changes:
     runs-on: ubuntu-latest
-    name: Initialize builds
     outputs:
-      changed_files: ${{ steps.changed_files.outputs.all }}
-      changed_addons: ${{ steps.changed_addons.outputs.addons }}
-      changed: ${{ steps.changed_addons.outputs.changed }}
+      changedAddons: ${{ steps.filter.outputs.changes }}
     steps:
-      - name: Check out the repository
+
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - name: Detect chanced files
+      uses: dorny/paths-filter@v2
+      id: filter
+      with:
+        filters: .github/paths-filter.yml
+
+  build-image:
+    name: Build changed addons
+    runs-on: ubuntu-latest
+    needs: check-addon-changes
+    strategy:
+      matrix:
+        addon: ${{ fromJSON(needs.check-addon-changes.outputs.changedAddons) }}
+    container:
+      image: homeassistant/amd64-builder:2021.03.3
+      options: --rm --privileged
+    steps:
+      
+      - name: Git install
+        run: |
+          apk add --no-cache git
+      - name: Checkout
         uses: actions/checkout@v2
 
-      - name: Get changed files
-        id: changed_files
-        uses: jitterbit/get-changed-files@v1
-        # @see https://github.com/jitterbit/get-changed-files/issues/11
-        continue-on-error: true
-
-      - name: Get add-ons
-        id: addons
+      - name: Detect chanced files
+        id: files-check
+        uses: dorny/paths-filter@v2.9.0
+        with:
+          filters: |
+            changed:
+              - ${{matrix.addon}}/**
+      - name: Get config
+        id: config
+        if: steps.files-check.outputs.changed == 'true'
+        shell: bash
         run: |
-          declare -a addons
-          for addon in $(find ./ -name config.json | cut -d "/" -f2 | sort -u); do
-            addons+=("$addon");
-          done
-          echo "::set-output name=addons::${addons[@]}"
-      - name: Get changed add-ons
-        id: changed_addons
+          IFS='/' read -r registry imagetemplate <<< "$(jq -r '.image' "${{ matrix.addon }}/config.json")"
+          name=$(jq -r '.name' "${{ matrix.addon }}/config.json")
+          description=$(jq -r '.description' "${{ matrix.addon }}/config.json")
+          version=$(jq -r '.version' "${{ matrix.addon }}/config.json")
+          archs=$(jq -r '.arch // ["armv7", "armhf", "amd64", "aarch64", "i386"] | [.[] | .] | join(" ")' "${{ matrix.addon }}/config.json")
+          archs_param=$(jq -r '.arch // ["armv7", "armhf", "amd64", "aarch64", "i386"] | [.[] | "--" + .] | join(" ")' ${{ matrix.addon }}/config.json)
+          image_names=""
+          if [[ "$imagetemplate" != 'null' ]]; then
+            for arch in ${archs}; do
+              image_names="${image_names} ${registry}/${imagetemplate/\{arch\}/$arch}"
+            done
+          fi
+          echo "Docker Registry: $registry"
+          echo "Imagetemplate: $imagetemplate"
+          echo "Version: $version"
+          echo "Architectures: $archs"
+          echo "Images: $image_names"
+          echo "::set-output name=name::$name"
+          echo "::set-output name=description::$description"
+          echo "::set-output name=registry::$registry"
+          echo "::set-output name=imagetemplate::$imagetemplate"
+          echo "::set-output name=version::$version"
+          echo "::set-output name=archs_param::$archs_param"
+          echo "::set-output name=image_names::$image_names"
+      - name: Build addon
+        if: steps.files-check.outputs.changed == 'true'
+        run: >
+          /usr/bin/builder.sh
+          ${{ steps.config.outputs.archs_param }}
+          -t ${{ matrix.addon }}
+          -d ${{ steps.config.outputs.registry }}
+          -i ${{ steps.config.outputs.imagetemplate }}
+          --cache-tag cache
+          --no-latest
+          --test
+      - name: Check images
+        if: steps.files-check.outputs.changed == 'true'
+        shell: bash
         run: |
-          declare -a changed_addons
-          for addon in ${{ steps.addons.outputs.addons }}; do
-            if [[ "${{ steps.changed_files.outputs.all }}" =~ $addon ]]; then
-              for file in ${{ env.MONITORED_FILES }}; do
-                  if [[ "${{ steps.changed_files.outputs.all }}" =~ $addon/$file ]]; then
-                    if [[ ! "${changed_addons[@]}" =~ $addon ]]; then
-                      changed_addons+=("\"${addon}\",");
-                    fi
-                  fi
-              done
+          missing=0
+          for image_name in ${{ steps.config.outputs.image_names }}; do
+            if [[ "$(docker images -q "$image_name:${{ steps.config.outputs.version }}" 2> /dev/null)" == "" ]]; then
+              echo "::error::No local image for $image_name found."
+              missing=$((missing + 1))
+            else
+              echo "Image $image_name found."
+              entrypoint=$(docker inspect "$image_name:${{ steps.config.outputs.version }}" | jq --raw-output '.[].Config.Entrypoint[]' 2>/dev/null || echo '')
+              cmd=$(docker inspect "$image_name:${{ steps.config.outputs.version }}" | jq --raw-output '.[].Config.Cmd[]' 2>/dev/null || echo '')
+              if [ -n "$cmd" ] || ([ "$entrypoint" != "/init" ] && [ "$entrypoint" != "/run.sh" ]); then
+                echo "::error::Invalid docker entrypoint found (Detected Entrypoint: '${entrypoint}', Detected Cmd: '${cmd}')"
+                exit 1
+              fi
+              
             fi
           done
-          changed=$(echo ${changed_addons[@]} | rev | cut -c 2- | rev)
-          if [[ -n ${changed} ]]; then
-            echo "Changed add-ons: $changed";
-            echo "::set-output name=changed::true";
-            echo "::set-output name=addons::[$changed]";
-          else
-            echo "No add-on had any monitored files changed (${{ env.MONITORED_FILES }})";
+          if [ "$missing" -gt "0" ]; then
+            docker images
+            exit 1
           fi
-  build:
-    needs: init
-    runs-on: ubuntu-latest
-    if: needs.init.outputs.changed == 'true'
-    name: Build ${{ matrix.arch }} ${{ matrix.addon }} add-on
-    strategy:
-      matrix: 
-        addon: ${{ fromJson(needs.init.outputs.changed_addons) }}
-#        arch: ["aarch64", "amd64", "armhf", "armv7", "i386"]
-        # because GitHub workers don't support others archs
-        arch: ["aarch64","amd64", "i386"]
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v2
-
-      - name: Get information
-        id: info
-        uses: home-assistant/actions/helpers/info@master
-        with:
-          path: "./${{ matrix.addon }}"
-
-      - name: Check add-on
-        id: check
-        run:
-           if [[ "${{ steps.info.outputs.architectures }}" =~ ${{ matrix.arch }} ]]; then
-              echo "::set-output name=build_arch::true";
-            else
-              echo "${{ matrix.arch }} is not a valid arch for ${{ matrix.addon }}, skipping build";
-           fi
-
-      - name: Set build arguments
-        if: steps.check.outputs.build_arch == 'true'
+      - name: Add docker image labels and tags
+        if: steps.files-check.outputs.changed == 'true'
+        shell: bash
         run: |
-          if [[ -z "${{ github.head_ref }}" ]] && [[ "${{ github.event_name }}" == "push" ]]; then
-              echo "BUILD_ARGS=--docker-hub-check" >> $GITHUB_ENV;
-          fi
-      - name: Login to DockerHub
-        if: env.BUILD_ARGS == '--docker-hub-check'
-        uses: docker/login-action@v1
+          for image_name in ${{ steps.config.outputs.image_names }}; do
+            echo "FROM $image_name:${{ steps.config.outputs.version }}" | docker build \
+              --label org.opencontainers.image.title="${{ steps.config.outputs.name }}" \
+              --label org.opencontainers.image.description="${{ steps.config.outputs.description }}" \
+              --label org.opencontainers.image.authors="Poeschl <Poeschl@users.noreply.github.com>" \
+              --label org.opencontainers.image.licenses="Apache License 2.0" \
+              --label org.opencontainers.image.url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
+              --label org.opencontainers.image.source="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/tree/master/${{ matrix.addon }}" \
+              --label org.opencontainers.image.documentation="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/tree/master/${{ matrix.addon }}" \
+              --label org.opencontainers.image.created="$(date -Is)" \
+              --label org.opencontainers.image.revision="${GITHUB_SHA}" \
+              --label org.opencontainers.image.version="${{ steps.config.outputs.version }}" \
+              -t "$image_name:${{ steps.config.outputs.version }}" -
+            echo "FROM $image_name:${{ steps.config.outputs.version }}" | docker build \
+              --label org.opencontainers.image.version=cache \
+              -t "$image_name:cache" -
+          done
+      - name: Docker Login
+        if: steps.files-check.outputs.changed == 'true'
+        uses: docker/login-action@v1.8.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_ACCESS_TOKEN }}
 
-      - name: Build ${{ matrix.addon }} add-on
-        if: steps.check.outputs.build_arch == 'true'
-        uses: home-assistant/builder@master
-        with:
-          args: |
-            ${{ env.BUILD_ARGS }} \
-            --${{ matrix.arch }} \
-            --target /data/${{ matrix.addon }} \
-            --docker-hub ${{ secrets.DOCKERHUB_USERNAME }}
+      - name: Push images
+        if: steps.files-check.outputs.changed == 'true'
+        shell: bash
+        run: |
+          for image_name in ${{ steps.config.outputs.image_names }}; do
+            docker push "$image_name:cache"
+            docker push "$image_name:${{ steps.config.outputs.version }}"
+          done

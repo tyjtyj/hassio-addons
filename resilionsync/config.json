@@ -26,8 +26,7 @@
         "aarch64",
         "amd64",
         "armhf",
-        "armv7",
-        "i386"
+        "armv7"
     ],
     "image": "tyjtyj/{arch}-addon-resiliosync"
 }

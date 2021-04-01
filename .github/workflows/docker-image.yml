@@ -14,12 +14,6 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v2
 
-    - name: Detect chanced files
-      uses: dorny/paths-filter@v2
-      id: filter
-      with:
-        filters: .github/paths-filter.yml
-
   build-image:
     name: Build changed addons
     runs-on: ubuntu-latest

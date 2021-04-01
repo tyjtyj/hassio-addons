@@ -7,26 +7,25 @@ FROM ${BUILD_FROM}
 # Copy root filesystem
 COPY root /
 
-#RUN apt-get update \
-# && DEBIAN_FRONTEND=noninteractive apt-get install -y jq smbclient \
-# && apt-get clean \
-# && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* ~/.cache
-#
-## Change the root folder for Nextcloud to the /share directory to be persistent
-#RUN  sed -i "s|/var/www|/share/nextcloud|g" /etc/apache2/sites-enabled/000-default.conf \
-#  && sed -i "s|/var/www|/share/nextcloud|g" /etc/apache2/apache2.conf \
-#  && sed -i "s|/var/www/html|/share/nextcloud/html|g" /entrypoint.sh \
-#  && sed -i "s|/var/www/html|/share/nextcloud/html|g" /usr/src/nextcloud/config/autoconfig.php
-#
-#RUN echo "ServerName localhost" | tee /etc/apache2/conf-available/fqdn.conf && a2enconf fqdn
+RUN \
+ echo "**** install resilio-sync ****" && \
+ if [ -z ${SYNC_VERSION+x} ]; then \
+	SYNC_VERSION=$(curl -sL https://help.resilio.com/hc/en-us/articles/206178924-Installing-Sync-package-on-Linux | awk -F '(download-cdn.resilio.com/|/Debian/)' '/x64/ {print $2}'); \
+ fi && \
+ curl -o \
+ /tmp/sync.deb -L \
+	"https://download-cdn.resilio.com/${SYNC_VERSION}/Debian/resilio-sync_${SYNC_VERSION}-1_arm64.deb" && \
+ dpkg -i \
+ /tmp/sync.deb && \
+ echo "**** cleanup ****" && \
+ rm -rf \
+	/tmp/*
 
-ENTRYPOINT [ "/usr/bin/run.sh" ]
-CMD ["apache2-foreground"]
+# add local files
+COPY root/ /
 
-# Build arguments
-ARG BUILD_ARCH
-ARG BUILD_DATE
-ARG BUILD_REF
-ARG BUILD_VERSION
+# ports and volumes
+EXPOSE 8888 55555
+VOLUME /config /sync
 
 

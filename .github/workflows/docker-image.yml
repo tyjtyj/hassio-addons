@@ -29,13 +29,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
-      - name: Detect chanced files
-        id: files-check
-        uses: dorny/paths-filter@v2.9.0
-        with:
-          filters: |
-            changed:
-              - ${{matrix.addon}}/**
+#      - name: Detect chanced files
+#        id: files-check
+#        uses: dorny/paths-filter@v2.9.0
+#        with:
+#          filters: |
+#            changed:
+#              - ${{matrix.addon}}/**
       - name: Get config
         id: config
         if: steps.files-check.outputs.changed == 'true'

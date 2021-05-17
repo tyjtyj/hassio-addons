@@ -38,7 +38,7 @@ jobs:
 #              - ${{matrix.addon}}/**
       - name: Get config
         id: config
-        if: steps.files-check.outputs.changed == 'true'
+#        if: steps.files-check.outputs.changed == 'true'
         shell: bash
         run: |
           IFS='/' read -r registry imagetemplate <<< "$(jq -r '.image' "${{ matrix.addon }}/config.json")"

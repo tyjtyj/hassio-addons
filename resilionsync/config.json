@@ -3,8 +3,8 @@
     "version": "20.0.3",
     "slug": "resiliosync",
     "description": "Self-hosted file share and collaboration platform on the web",
-    "url": "https://github.com/tyjtyj/hassio-addons/tyjtyj/master/resiliosync",
-    "webui": "http://[HOST]:[PORT:80]",
+    "url": "https://github.com/tyjtyj/hassio-addons",
+    "webui": "http://[HOST]:[PORT:8888]",
     "panel_icon": "mdi:cloud-sync",
     "startup": "services",
     "boot": "auto",
@@ -28,5 +28,5 @@
         "armhf",
         "armv7"
     ],
-    "image": "tyjtyj/{arch}-addon-resiliosync"
+    
 }

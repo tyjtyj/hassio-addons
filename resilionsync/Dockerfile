@@ -1,6 +1,6 @@
 ARG BUILD_FROM
 ARG BUILD_VERSION
-ARG BUILD_UPSTREAM="2.7.2.1375"
+ARG BUILD_UPSTREAM="2.7.2.1375-ls90"
 FROM ${BUILD_FROM}${BUILD_UPSTREAM}
 #docker run -d   --name=resilio-sync -e UMASK=022  -e PUID=1000   -e PGID=100   -e TZ=Asia/Singapore   -p 8888:8888   -p 55555:55555   -v /usr/share/rsync:/config   -v /usr/share/rsync/downloads:/downloads   -v /media/nashdd/:/sync   --restart unless-stopped   ghcr.io/linuxserver/resilio-sync
 #docker pull ghcr.io/linuxserver/resilio-sync:version-2.7.2.1375@sha256:ccc80929245d8051f8964918dfeaf2617cfa4e9e3d257e4095ef6b9b6aaaadf4

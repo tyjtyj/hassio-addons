@@ -8,8 +8,8 @@
     "startup": "services",
     "boot": "auto",
     "ports": {
-        "8888/tcp": null,
-        "55555/tcp": null
+        "8888/tcp": 8888,
+        "55555/tcp": 55555
     },
     "ports_description": {
         "8888/tcp": "Web interface",

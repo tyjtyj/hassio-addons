@@ -20,9 +20,6 @@ FROM ${BUILD_FROM}${BUILD_UPSTREAM}
 #    && ln -s /usr/lib/bashio/bashio /usr/bin/bashio \
 #    && rm -fr /tmp/bashio.tar.gz
 
-# Copy root filesystem
-COPY rootfs /
-
 # MOFIFY DATA PATH
 #RUN sed -i "s|config|config/resilio-sync|g" /etc/services.d/resilio-sync/run \
 #    && sed -i "s|config|config/resilio-sync|g" /etc/cont-init.d/20-config \

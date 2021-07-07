@@ -17,9 +17,15 @@
     "map": [
         "share:rw"
     ],
-    "environment": {
-    "PUID": "1000",
-    "GUID": "1000"
+    "options": {
+      "PUID": 0,
+      "PGID": 0
+    },
+    "schema": {
+      "PUID": "int",
+      "PGID": "int",
+      "WebuiPass": "str?",
+      "FG_PLUGINS": "str?"
     },
     "options": {
     },

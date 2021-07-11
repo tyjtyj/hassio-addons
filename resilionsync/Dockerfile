@@ -1,6 +1,6 @@
 ARG BUILD_FROM
 ARG BUILD_VERSION
-ARG BUILD_UPSTREAM="2.7.2.1375-ls90"
+ARG BUILD_UPSTREAM="2.7.2.1375-ls92"
 FROM ${BUILD_FROM}${BUILD_UPSTREAM}
 #docker run -d   --name=resilio-sync -e UMASK=022  -e PUID=1000   -e PGID=100   -e TZ=Asia/Singapore   -p 8888:8888   -p 55555:55555   -v /usr/share/rsync:/config   -v /usr/share/rsync/downloads:/downloads   -v /media/nashdd/:/sync   --restart unless-stopped   ghcr.io/linuxserver/resilio-sync
 #docker pull ghcr.io/linuxserver/resilio-sync:version-2.7.2.1375@sha256:ccc80929245d8051f8964918dfeaf2617cfa4e9e3d257e4095ef6b9b6aaaadf4
@@ -28,8 +28,8 @@ RUN \
     \
 
 # MOFIFY DATA PATH
-#RUN sed -i "s|config|config/resilio-sync|g" /etc/services.d/resilio-sync/run \
-#    && sed -i "s|config|config/resilio-sync|g" /etc/cont-init.d/20-config \
+RUN sed -i "s|config|config/resilio-sync|g" /etc/services.d/resilio-sync/run \
+    && sed -i "s|config|config/resilio-sync|g" /etc/cont-init.d/20-config \
     # Allow UID and GID setting
     && sed -i 's/bash/bashio/g' /etc/cont-init.d/10-adduser \
     && sed -i 's/{PUID:-911}/(bashio::config "PUID")/g' /etc/cont-init.d/10-adduser \
